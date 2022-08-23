@@ -23,6 +23,17 @@ const submitAddDevice = Selector('a.submitButton')
 const deviceOptions = text => deviceName.withText(text).parent(1).find('div.device-options') //search div whit class device-options
 const optionType = selectType.find('option').withText(newType)
 
+const randomString = (length) => {
+    let result           = '';
+    let characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let charactersLength = characters.length;
+    for ( let i = 0; i < length; i++ ) {
+      result += characters.charAt(Math.floor(Math.random() * 
+ charactersLength));
+   }
+   return result;
+}
+
 	test(`Test 1`, async (t) => {
 			const devices = await getDevices() // Get Devices from API
 
@@ -32,18 +43,19 @@ const optionType = selectType.find('option').withText(newType)
 				const removeButton = option.find('button.device-remove');
 
 				await t
-					.expect(deviceName.withText(device.system_name).visible).ok() // Validate device name
-					.expect(deviceType.withText(device.type).visible).ok() // Validate device type
-					.expect(deviceCapacity.withText(device.hdd_capacity).visible).ok() // Validate davice capacity
+					.expect(deviceName.withText(device.system_name).exists).ok() // Validate device name
+					.expect(deviceType.withText(device.type).exists).ok() // Validate device type
+					.expect(deviceCapacity.withText(device.hdd_capacity).exists).ok() // Validate davice capacity
 					.expect(editButton.exists).ok() //Validate button exists
 					.expect(removeButton.exists).ok(); //Validate button exists
 			}
 		});
 	
 	test(`Test 2`, async t => {
+		const newName2 = randomString(5)
 		await t
 		    .click(submitAddDevice)
-			.typeText(inputName, newName)
+			.typeText(inputName, newName2)
 			.click(selectType)
 			.click(optionType)
 			.typeText(inputCapacity, newCapacity)
@@ -52,7 +64,7 @@ const optionType = selectType.find('option').withText(newType)
 			await t.eval(() => location.reload(true))
 	
 		const devices =	await getDevices()
-		const newDevice = devices.find(device => device.system_name === newName) // search for new device added
+		const newDevice = devices.find(device => device.system_name === newName2) // search for new device added
 	
 	await t
 		.expect(deviceName.withText(newDevice.system_name).visible).ok() // Validate device name
@@ -60,37 +72,62 @@ const optionType = selectType.find('option').withText(newType)
 		.expect(deviceCapacity.withText(newDevice.hdd_capacity).visible).ok() // Validate davice capacity	
 	});
 
-	test('Test 3', async t => {
+	test.only('Test 3', async t => { 
 
 		//Renames the first device of the list to “Renamed Device”.
-
-		const devices =	await getDevices()
-		const newName = 'UPDATE_DEVICE_OMAR'
+		
+		const newName2 = randomString(5)
 		const payload = {
-			'system_name': newName,
-			'type': devices[0].type,
-			'hdd_capacity': devices[0].hdd_capacity
+			system_name: newName2,
+			type: "MAC",
+			hdd_capacity: "666"
 		}
-		await updateDevice(devices[0].id, payload)	//Update device through API
+		await updateDevice(t.ctx.device.id, payload)	//Update device through API
 		await t.eval(() => location.reload(true))
 		const devicesUpdated = await getDevices()
+		const deviceUpdated = devicesUpdated.find(device => device.id === t.ctx.device.id)
 	
 		await t
-			.expect(devicesUpdated[0].system_name).eql(newName)	// Validate device name in data
-			.expect(deviceName.withText(newName).visible).ok() // Validate device name in UI
+			.expect(deviceUpdated.system_name).eql(newName2)	// Validate device name in data
+			.expect(deviceName.withText(newName2).visible).ok() // Validate device name in UI
+			
+	}).before(async t => {  
+		const newName1 = randomString(5)
+		const payloadNewDevice = {
+			system_name: newName1,
+			type: "WINDOWS WORKSTATION",
+			hdd_capacity: "777"
+		}
+		const newDevice = await createDevice(payloadNewDevice)
+		t.ctx.device = newDevice
+		
+	}).after(async t => {  
+
+		t.ctx.device.id && await deleteDevice(t.ctx.device.id)	//Delete device through API
+		console.log(t.ctx.device.id)
 	});
+
+
 
 	test('Test 4', async t => {
 
-		const devices =	await getDevices()
-		const newName = 'omardevice'
-		const payload = {
-			'system_name': newName,
-			'type': devices[0].type,
-			'hdd_capacity': devices[0].hdd_capacity
+		const newName1 = randomString(5)
+		const payloadNewDevice = {
+			system_name: newName1,
+			type: "WINDOWS WORKSTATION",
+			hdd_capacity: "777"
 		}
-		await deleteDevice(devices[0].id, payload)	//Delete device through API
+		const newDevice = await createDevice(payloadNewDevice)
+		await t.eval(() => location.reload(true))
+		await t.expect(deviceName.withText(newName1).visible).ok()
+
+		await deleteDevice(newDevice.id)	//Delete device through API
 		await t.eval(() => location.reload(true))
 		const devicesUpdated = await getDevices()
+		const deviceUpdated = devicesUpdated.find(device => device.id === newDevice.id)
+
+		await t
+			.expect(deviceUpdated).notOk()	// Validate device name in data
+			.expect(deviceName.withText(newName1).visible).notOk() // Validate device name in UI
 	});
 	
